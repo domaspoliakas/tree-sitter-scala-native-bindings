@@ -1,0 +1,10 @@
+target/
+.scalafmt-common.conf
+.bsp/
+.idea/
+.bloop/
+.metals/
+.vscode/
+project/.bloop/
+project/metals.sbt
+project/project/
