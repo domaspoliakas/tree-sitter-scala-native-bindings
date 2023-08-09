@@ -22,6 +22,7 @@ lazy val json =
   project
     .in(file("modules/json"))
     .enablePlugins(ScalaNativePlugin)
+    .dependsOn(core)
     .settings(
       Compile / resourceGenerators += Def.task {
         val jsonParserLocation =
