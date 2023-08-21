@@ -1,6 +1,6 @@
 # Tree-sitter for scala native
 
-A library to make it easy for you to use treesitter from scala native.
+A library to make it easy for you to use treesitter from scala native. Will probably go nowhere but who knows!
 
 ### Testing
 
