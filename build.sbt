@@ -16,32 +16,9 @@ lazy val core =
       scalaVersion := "3.3.0"
     )
 
-lazy val coreRef = LocalProject("core")
-
-lazy val json = 
-  project
-    .in(file("modules/json"))
-    .enablePlugins(ScalaNativePlugin)
-    .dependsOn(core)
-    .settings(
-      Compile / resourceGenerators += Def.task {
-        val jsonParserLocation =
-          (root / baseDirectory).value / "tree-sitter-json" / "src"
-
-        val resourcesFolder = (Compile / resourceManaged).value / "scala-native"
-
-        val fileNames = List(
-          "parser.c"
-        )
-
-        fileNames.foreach { fileName =>
-          IO.copyFile(jsonParserLocation / fileName, resourcesFolder / fileName)
-        }
-
-        fileNames.map(fileName => resourcesFolder / fileName)
-      },
-      nativeConfig := {
-        val base = (root / baseDirectory).value / "tree-sitter"
+lazy val treesitterTestConfig = Seq(
+      Test / nativeConfig := {
+        val base = (ThisBuild / baseDirectory).value / "tree-sitter"
         val conf = nativeConfig.value
         val staticLib = base / "libtree-sitter.a"
 
@@ -57,9 +34,22 @@ lazy val json =
       },
       libraryDependencies +=  "com.disneystreaming" %%% "weaver-cats" % "0.8.3" % Test,
       testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+
     )
 
-lazy val jsonRef = LocalProject("json")
+lazy val json = 
+  project
+    .in(file("modules/json"))
+    .enablePlugins(ScalaNativePlugin)
+    .dependsOn(core)
+    .settings(treesitterTestConfig)
+
+lazy val yaml = 
+  project
+    .in(file("modules/yaml"))
+    .enablePlugins(ScalaNativePlugin)
+    .dependsOn(core)
+    .settings(treesitterTestConfig)
 
 lazy val root = project.in(file("."))
-  .aggregate(coreRef, jsonRef)
+  .aggregate(core, json)

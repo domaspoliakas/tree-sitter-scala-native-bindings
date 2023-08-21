@@ -12,11 +12,9 @@ object JsonSuite extends weaver.FunSuite {
     Zone: zone => 
       given Zone = zone
       val parser = ts_parser_new()
-      ts_parser_set_language(parser, tree_sitter_json())
+      ts_parser_set_language(parser, tree_sitter_yaml())
 
-      val source = c"""
-        { "hello": "bye" }
-      """
+      val source = c"""hello: hello"""
 
       val tree = 
         ts_parser_parse_string(parser, null, source, strlen(source).toUInt)
