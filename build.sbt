@@ -51,5 +51,19 @@ lazy val yaml =
     .dependsOn(core)
     .settings(treesitterTestConfig)
 
+lazy val sql = 
+  project
+    .in(file("modules/sql"))
+    .enablePlugins(ScalaNativePlugin)
+    .dependsOn(core)
+    .settings(treesitterTestConfig)
+
+lazy val tests = 
+  project
+    .in(file("modules/tests"))
+    .enablePlugins(ScalaNativePlugin)
+    .dependsOn(sql, yaml)
+    .settings(treesitterTestConfig)
+
 lazy val root = project.in(file("."))
-  .aggregate(core, json)
+  .aggregate(core, json, yaml, sql, tests)

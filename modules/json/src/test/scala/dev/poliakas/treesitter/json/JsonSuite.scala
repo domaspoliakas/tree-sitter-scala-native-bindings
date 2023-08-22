@@ -14,7 +14,7 @@ object JsonSuite extends weaver.FunSuite {
       val parser = ts_parser_new()
       ts_parser_set_language(parser, tree_sitter_json())
 
-      val source = c"""
+      val source: CString = c"""
         { "hello": "bye" }
       """
 
