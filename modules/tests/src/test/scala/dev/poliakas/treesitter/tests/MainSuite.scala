@@ -1,4 +1,5 @@
-package dev.poliakas.treesitter.tests
+package dev.poliakas.treesitter
+package tests
 
 import dev.poliakas.treesitter.core.*
 import dev.poliakas.treesitter.yaml.tree_sitter_yaml
@@ -7,7 +8,6 @@ import treesitter.all.*
 import scala.scalanative.unsafe.*
 import scala.scalanative.unsigned.*
 import scala.scalanative.libc.string.strlen
-import scala.scalanative.libc.stdio
 
 object MainSuite extends weaver.FunSuite:
   test("hek"):
@@ -15,75 +15,129 @@ object MainSuite extends weaver.FunSuite:
       given Zone = zone
 
       // first - set up the parsers
-      val parserYaml = ts_parser_new()
-      ts_parser_set_language(parserYaml, tree_sitter_yaml())
+      val parserYaml = yaml.Language.newParser
 
-      val parserSql = ts_parser_new()
-      ts_parser_set_language(parserSql, tree_sitter_sql())
+      val parserSql = sql.Language.newParser
 
       val source =
         """hello: 
           |  sql: SELECT column FROM table
           |  potato: tomato""".stripMargin
 
-      val sourceC: CString = toCString(source)
-
       // parse the main language
-      val tree = ts_parser_parse_string(
-        parserYaml,
-        null,
-        sourceC,
-        strlen(sourceC).toUInt
-      )
+      val treeMaybe = parserYaml.parseString(None, source)
 
-      val treeOk = expect(tree != null)
+      val treeOk = expect(treeMaybe.isDefined)
 
-      val rootNode: Ptr[TSNode] = alloc[TSNode](1)
-      ts_tree_root_node(tree)(rootNode)
+      treeMaybe match
+        case None => treeOk
+        case Some(tree) =>
+          val rootNode = ts_tree_root_node(tree.value)
 
-      // Construct the query to find the injections
-      val errorOffset = alloc[uint32_t](1)
-      val errorType = alloc[TSQueryError](1)
+          // Construct the query to find the injections
 
-      val injectionQueryString =
-        """(block_mapping_pair key: (flow_node) @key value: (flow_node) @value)"""
+          val injectionQueryString =
+            """(block_mapping_pair key: (flow_node) @key (#eq? @key "sql") value: (flow_node) @value)"""
 
-      val q = Query.create(Language.from(tree_sitter_yaml()), injectionQueryString)
+          val q = Query.create(
+            Language.from(tree_sitter_yaml()),
+            injectionQueryString
+          )
 
-      q match {
-        case Left(err) => failure(err.toString())
-        case Right(q) => success
-      }
+          q match
+            case Left(err) => failure(err.toString())
+            case Right(q) =>
+              val ehoo = expect(2 == q.stringLiteralCount) and
+                expect(2 == q.captureCount) and
+                expect(1 == q.patternCount)
 
-      // val injectionQuery = ts_query_new(
-      //   tree_sitter_yaml(),
-      //   injectionQueryString,
-      //   strlen(injectionQueryString).toUInt,
-      //   errorOffset,
-      //   errorType
-      // )
+              val captures =
+                q.captures
 
-      // val queryOk =
-      //   expect(!errorType != TSQueryError.TSQueryErrorNodeType) and
-      //     expect(!errorType != TSQueryError.TSQueryErrorSyntax) and
-      //     expect(!errorType != TSQueryError.TSQueryErrorLanguage)
+              val stringLiterals =
+                q.stringLiterals
 
-      // Create the query iterator to iterate over the results
+              val predicatesByPattern = q.predicatesByPattern
 
-      // val queryCursor = ts_query_cursor_new()
-      // ts_query_cursor_exec(queryCursor, injectionQuery, rootNode)
+              val eyoo = ehoo and
+                expect(captures(0) == "key") and
+                expect(captures(1) == "value") and
+                expect(stringLiterals(0) == "eq?") and
+                expect(stringLiterals(1) == "sql") and
+                expect(predicatesByPattern.length == 1) and
+                expect(predicatesByPattern(0).length == 1) and
+                expect(
+                  predicatesByPattern(0)(0) == Query.Predicate.Eq(
+                    false,
+                    Query.PredicateArg.StringLiteral("sql"),
+                    Query.PredicateArg.Capture("key")
+                  )
+                )
 
-      // val queryMatch = alloc[TSQueryMatch](1)
-      // var moreMatches = ts_query_cursor_next_match(queryCursor, queryMatch)
+              val cursor = q.newCursor(Node.from(rootNode))
 
-      // while(moreMatches) {
+              val queryMatch = alloc[TSQueryMatch](1)
+              var moreMatches = ts_query_cursor_next_match(cursor.value, queryMatch)
 
-        // injectionQuery
+              var sqlNodes: List[Map[String, (String, TSNode)]] = Nil
 
-      // }
+              while (moreMatches) do
 
+                val matcherooney = (!queryMatch)
 
-      // treeOk and queryOk
+                val matchCaptures = 
+                  (for i <- (0 until matcherooney.capture_count.toInt).toList yield 
+                    val capture = (matcherooney.captures + i)
+                    val startByte = ts_node_start_byte((!capture).node)
+                    val endByte = ts_node_end_byte((!capture).node) 
+                    val s = source.slice(startByte.toInt, endByte.toInt)
+
+                    (captures((!capture).index.toInt), (s, (!capture).node))).toMap
+
+                val preds = predicatesByPattern(matcherooney.pattern_index.toInt)
+
+                val shouldInclude = preds.forall:  
+                  case Query.Predicate.Eq(negated, left, right) => 
+                    val l = left match 
+                      case Query.PredicateArg.StringLiteral(literal) => literal
+                      case Query.PredicateArg.Capture(captureName) => matchCaptures(captureName)._1
+
+                    val r = right match 
+                      case Query.PredicateArg.StringLiteral(literal) => literal
+                      case Query.PredicateArg.Capture(captureName) => matchCaptures(captureName)._1
+
+                    (l == r) == !negated
+                  case Query.Predicate.AnyOf(_, _, _) => 
+                    // TODO
+                    false
+
+                if (shouldInclude)
+                  sqlNodes = matchCaptures :: sqlNodes
+
+                moreMatches = ts_query_cursor_next_match(cursor.value, queryMatch)
+              end while
+              
+              val ehooey = eyoo and 
+                expect(sqlNodes.size == 1) and
+                expect(sqlNodes(0).size == 2)
+                // expect(sqlNodes(0).get("key").map(_._1) == Some("hek"))
+
+              val rangerooneys = 
+                sqlNodes.map: m => 
+                  val node = m("key")._2
+                  val rangePtr = alloc[TSRange](1)
+                  val range = !rangePtr
+                  range.start_point = ts_node_start_point(node)
+                  range.end_point = ts_node_end_point(node)
+                  range.start_byte = ts_node_start_byte(node)
+                  range.end_byte = ts_node_end_byte(node)
+                  Range.from(rangePtr)
+
+              parserSql.setRanges(rangerooneys)
+
+              val tree = parserSql.parseString(None, source)
+
+              ehooey and expect(tree.isDefined)
 
       // Parse the document using the outer parser
       // query the ranges for the injections

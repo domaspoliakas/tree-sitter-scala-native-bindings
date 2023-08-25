@@ -3,19 +3,22 @@ package dev.poliakas.treesitter.core
 import treesitter.all.*
 import scala.scalanative.libc.string.strlen
 import scala.scalanative.unsafe.*
-import scala.scalanative.unsigned.UInt
+import scala.scalanative.unsigned.*
 
 opaque type Language = Ptr[TSLanguage]
 object Language:
   def from(ptr: Ptr[TSLanguage]): Language = ptr
-  extension (self: Language) inline final def value: Ptr[TSLanguage] = self
+  extension (self: Language)
+    inline final def value: Ptr[TSLanguage] = self
+    def newParser: Parser =
+      val parser = ts_parser_new()
+      ts_parser_set_language(parser, self)
+      parser
 
 opaque type Tree = Ptr[TSTree]
 object Tree:
   def from(ptr: Ptr[TSTree]): Tree = ptr
-  extension (self: Tree)
-    inline final def value: Ptr[TSTree] = self
-    def rootNode(using Zone) = ts_tree_root_node(self)
+  extension (self: Tree) inline final def value: Ptr[TSTree] = self
 
 opaque type Parser = Ptr[TSParser]
 object Parser:
@@ -25,6 +28,26 @@ object Parser:
   extension (self: Parser)
     inline final def value: Ptr[TSParser] = self
     def delete: Unit = ts_parser_delete(self)
+    def setRanges(ranges: List[Range])(using Zone): Unit =
+      val rangesC = alloc[TSRange](ranges.size)
+
+      for i <- (0 until ranges.size) do !(rangesC + i) = (!Range.value(ranges(0)))
+
+      ts_parser_set_included_ranges(self, rangesC, ranges.size.toUInt)
+
+    def parseString(oldTree: Option[Tree], src: String): Option[Tree] =
+      Zone: zone =>
+        given Zone = zone
+        val srcC = toCString(src)
+
+        Option(
+          ts_parser_parse_string(
+            self,
+            oldTree.orNull,
+            srcC,
+            strlen(srcC).toUInt
+          )
+        )
 
 opaque type Node = Ptr[TSNode]
 object Node:
@@ -32,93 +55,29 @@ object Node:
   extension (self: Node)
     inline final def value: Ptr[TSNode] = self
     def childCount: UInt = ts_node_child_count(self)
+    def sliceFrom(source: String): String =
+      val startByte = ts_node_start_byte(self)
+      val endByte = ts_node_end_byte(self)
+      new String(source.getBytes().slice(startByte.toInt, endByte.toInt))
 
 opaque type Range = Ptr[TSRange]
 object Range:
   def from(ptr: Ptr[TSRange]): Range = ptr
   extension (self: Range) inline final def value: Ptr[TSRange] = self
 
-opaque type Query = Ptr[TSQuery]
-object Query:
-  enum CreationError:
-    case LanguageError
-    case NodeTypeError(badNode: String)
-    case FieldError(badField: String)
-    case CaptureError(badCapture: String)
-    case SyntaxError(message: String)
-    case StructureError
+opaque type QueryCursor = Ptr[TSQueryCursor]
+object QueryCursor:
+  def from(ptr: Ptr[TSQueryCursor]): QueryCursor = ptr
+  extension (self: QueryCursor)
+    inline final def value: Ptr[TSQueryCursor] = self
+    def delete: Unit = ts_query_cursor_delete(self)
 
+opaque type QueryMatch = Ptr[TSQueryMatch]
+object QueryMatch:
+  def from(ptr: Ptr[TSQueryMatch]): QueryMatch = ptr
+  extension (self: QueryMatch) inline final def value: Ptr[TSQueryMatch] = self
 
-  def from(ptr: Ptr[TSQuery]): Query = ptr
-  def create(
-      language: Language,
-      queryString: String
-  ): Either[Query.CreationError, Query] =
-    Zone: zone =>
-      given Zone = zone
-
-      val queryC = toCString(queryString)
-      val errorOffset = alloc[uint32_t](1)
-      val errorType = alloc[TSQueryError](1)
-      val query = ts_query_new(
-        language,
-        queryC,
-        strlen(queryC).toUInt,
-        errorOffset,
-        errorType
-      )
-
-      if (query != null) Right(query)
-      else
-        val err = !errorType
-        if err == TSQueryError.TSQueryErrorLanguage then
-          Left(CreationError.LanguageError)
-        else if err == TSQueryError.TSQueryErrorNodeType then
-          Left(CreationError.NodeTypeError(getOffender(queryC, errorOffset)))
-        else if err == TSQueryError.TSQueryErrorField then
-          Left(CreationError.FieldError(getOffender(queryC, errorOffset)))
-        else if err == TSQueryError.TSQueryErrorNodeType then
-          Left(CreationError.CaptureError(getOffender(queryC, errorOffset)))
-        else if err == TSQueryError.TSQueryErrorSyntax then
-          Left(CreationError.SyntaxError(constructMessage(queryC, errorOffset)))
-        else if err == TSQueryError.TSQueryErrorStructure then
-          Left(CreationError.SyntaxError(constructMessage(queryC, errorOffset)))
-
-        else throw new Exception("An unrecognised query error has occurred")
-
-  private def getOffender(str: CString, offset: Ptr[uint32_t]): String =
-    fromCString((str + (!offset))).takeWhile(c =>
-      c.isDigit || c.isLetter || c == '_' || c == '-'
-    )
-
-  private def constructMessage(queryC: CString, errorOffset: Ptr[uint32_t]): String = 
-    var lineStart = 0
-    var lineEnd = strlen(queryC).toInt
-
-    var i = (!errorOffset).toInt
-    while (i >= 0) {
-      val b: Byte = (!(queryC + i))
-      if b == '\n' then
-        lineStart = i
-        i = -1
-      else 
-        i = i - 1
-    }
-
-    while (i <= strlen(queryC).toInt) {
-      val b: Byte = (!(queryC + i))
-      if b == '\n' then
-        lineEnd = i
-        i = strlen(queryC).toInt + 1
-      else 
-        i = i + 1
-    }
-
-    val column = (!errorOffset).toInt - lineStart
-    val line = fromCString(queryC + lineStart).take(lineEnd - lineStart)
-
-    s"\n$line\n${" " * column}^"
-
-  extension (self: Query)
-    inline final def value: Ptr[TSQuery] = self
-    def destroy: Unit = ts_query_delete(self)
+opaque type Quantifier = TSQuantifier
+object Quantifier:
+  def from(quantifier: TSQuantifier): Quantifier = quantifier
+  extension (self: Quantifier) inline final def value: TSQuantifier = self
