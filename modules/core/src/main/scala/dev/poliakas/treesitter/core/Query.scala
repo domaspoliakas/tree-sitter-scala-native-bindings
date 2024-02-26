@@ -89,16 +89,19 @@ object Query:
               val newPred = 
                 if currentPredicateFunction == null then
                   throw new Exception("A predicate with no function detected?")
+
                 else if currentPredicateFunction == "eq?" || currentPredicateFunction == "not-eq?" then
                   if currentPredicateArgs.size != 2 then
                     throw new Exception(s"eq/not-eq must have 2 arguments, got ${currentPredicateArgs.size}")
 
                   Predicate.Eq(currentPredicateFunction == "not-eq?", currentPredicateArgs(0), currentPredicateArgs(1))
+
                 else if currentPredicateFunction == "any-of?" || currentPredicateFunction == "not-any-of?" then
                   if currentPredicateArgs.size >= 2 then
                     throw new Exception(s"any-of/not-any-of must have 2 or more arguments, got ${currentPredicateArgs.size}")
 
-                  Predicate.AnyOf(currentPredicateFunction == "not-eq?", currentPredicateArgs.head, currentPredicateArgs.tail)
+                  Predicate.AnyOf(currentPredicateFunction == "not-any-of?", currentPredicateArgs.head, currentPredicateArgs.tail)
+
                 else throw new Exception(s"Unsupported predicate function: $currentPredicateFunction")
 
               res = newPred :: res
@@ -129,7 +132,7 @@ object Query:
           val strC = ts_query_string_value_for_id(self, i.toUInt, length)
           fromCString(strC)
 
-  def from(ptr: Ptr[TSQuery]): Query = ptr
+  inline def from(ptr: Ptr[TSQuery]): Query = ptr
 
   def create(
       language: Language,
