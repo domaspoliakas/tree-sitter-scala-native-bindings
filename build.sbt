@@ -2,6 +2,7 @@ import java.nio.file.Paths
 import java.io.File
 
 ThisBuild / scalaVersion := "3.3.0"
+ThisBuild / version := "0.0.1"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
