@@ -41,10 +41,10 @@ case class DocumentString(source: String, lineBreaks: Vector[Int]):
     val newStrLines = newString.split("\n")
 
     val potato: UInt = 
-      (if newStrLines.length == 1 then
+      if newStrLines.length == 1 then
         ((!to.value).column.toInt + newStrLines.head.length).toUInt
       else
-        newStrLines.last.length.toUInt): UInt
+        newStrLines.last.length.toUInt
 
     tsInputEdit.new_end_point.row = ((!to.value).row.toInt + (newStrLines.length - 1)).toUInt
     tsInputEdit.new_end_point.column = potato
