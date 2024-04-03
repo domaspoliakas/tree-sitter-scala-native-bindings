@@ -27,12 +27,43 @@ object Tree:
 
 opaque type Node = Ptr[TSNode]
 object Node:
+  import Point.*
+  
   inline def from(ptr: Ptr[TSNode]): Node = ptr
   extension (self: Node)
     inline final def value: Ptr[TSNode] = self
     def childCount: Int = ts_node_child_count(self).toInt
     def startByte: Int = ts_node_start_byte(self).toInt
     def endByte: Int = ts_node_end_byte(self).toInt
+    def startPoint(using Zone) = 
+      val result = alloc[TSPoint](1)
+      ts_node_start_point(self)(result)
+      Point.from(result)
+
+    def endPoint(using Zone) = 
+      val result = alloc[TSPoint](1)
+      ts_node_end_point(self)(result)
+      Point.from(result)
+
+    def contains(point: Point): Boolean = Zone { zone =>
+      given Zone = zone
+      val sp: Point = startPoint
+      val ep: Point = endPoint
+
+      val startCond = 
+        (sp.row < point.row) || (
+          sp.row == point.row && sp.column <= point.column
+          )
+
+      val endCond = 
+        (ep.row > point.row) || (
+          ep.row == point.row && ep.column >= point.column
+          )
+
+      startCond && endCond
+      
+    }
+
     def sliceFrom(source: String): String =
       new String(source.getBytes().slice(startByte, endByte))
     def nodeString: String = 

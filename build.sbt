@@ -7,7 +7,6 @@ ThisBuild / version := "0.0.1"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / organization := "dev.poliakas"
-ThisBuild / version      := "0.1-SNAPSHOT"
 
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
